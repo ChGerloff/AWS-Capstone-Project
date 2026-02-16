@@ -147,6 +147,8 @@ resource "aws_instance" "web_server" {
 
     systemctl enable mariadb
     systemctl start mariadb
+    sleep 5
+    systemctl restart mariadb
 
     # Secure MySQL and create WordPress DB
     mysql -e "CREATE DATABASE wordpress;"
