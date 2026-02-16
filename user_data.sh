@@ -27,17 +27,28 @@ echo "Creating WordPress database and user..."
 sudo mysql <<'EOF' >>/var/log/user-data.log 2>&1
 CREATE DATABASE IF NOT EXISTS wordpress;
 DROP USER IF EXISTS 'wpuser'@'localhost';
-CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
+DROP USER IF EXISTS 'wpuser'@'%';
+CREATE USER IF NOT EXISTS 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
+CREATE USER IF NOT EXISTS 'wpuser'@'%' IDENTIFIED BY 'StrongPassword123!';
 GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
+GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'%';
 FLUSH PRIVILEGES;
 EOF
 
-echo "Testing DB user..."
-sudo mysql -u wpuser -pStrongPassword123! wordpress -e "SELECT 1;" >> /var/log/user-data.log 2>&1
+echo "Testing DB user (socket localhost)..." >> /var/log/user-data.log
+sudo mysql -u wpuser -p'StrongPassword123!' -h localhost wordpress -e "SELECT 1;" >> /var/log/user-data.log 2>&1
 if [ $? -eq 0 ]; then
-  echo "Database connection successful!" >> /var/log/user-data.log
+  echo "Database connection successful (localhost)" >> /var/log/user-data.log
 else
-  echo "ERROR: Database connection failed!" >> /var/log/user-data.log
+  echo "ERROR: Database connection failed (localhost)" >> /var/log/user-data.log
+fi
+
+echo "Testing DB user (127.0.0.1 TCP)..." >> /var/log/user-data.log
+sudo mysql -u wpuser -p'StrongPassword123!' -h 127.0.0.1 wordpress -e "SELECT 1;" >> /var/log/user-data.log 2>&1
+if [ $? -eq 0 ]; then
+  echo "Database connection successful (127.0.0.1)" >> /var/log/user-data.log
+else
+  echo "ERROR: Database connection failed (127.0.0.1)" >> /var/log/user-data.log
 fi
 
 cd /var/www/html
@@ -48,11 +59,10 @@ rm -rf wordpress latest.tar.gz
 
 cp wp-config-sample.php wp-config.php
 
-# Update database configuration with proper escaping
-sed -i "s/'DB_NAME', 'database_name_here'/'DB_NAME', 'wordpress'/" wp-config.php
-sed -i "s/'DB_USER', 'username_here'/'DB_USER', 'wpuser'/" wp-config.php
-sed -i "s/'DB_PASSWORD', 'password_here'/'DB_PASSWORD', 'StrongPassword123!'/" wp-config.php
-sed -i "s/'DB_HOST', 'localhost'/'DB_HOST', 'localhost'/" wp-config.php
+# Replace the common placeholder tokens in the sample config
+sed -i "s/database_name_here/wordpress/" wp-config.php
+sed -i "s/username_here/wpuser/" wp-config.php
+sed -i "s/password_here/StrongPassword123!/" wp-config.php
 
 echo "WordPress configuration updated" >> /var/log/user-data.log
 
@@ -62,26 +72,33 @@ DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
 wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
 
 IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
-# Use curl with cookie handling for Google Drive download
-curl -L -b /tmp/cookies.txt -c /tmp/cookies.txt "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/images.zip
+# Robust Google Drive download: fetch page, extract confirm token if present, then download
+curl -s -L -c /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/gdpage
 
-# If file is still HTML (Google Drive confirmation needed), extract token and retry
-if file /tmp/images.zip | grep -q "HTML"; then
-  echo "Google Drive confirmation required, extracting token..." >> /var/log/user-data.log
-  CONFIRM_TOKEN=$(grep -oP '(?<=confirm=)[^&]*' /tmp/images.zip | head -1)
-  if [ ! -z "$CONFIRM_TOKEN" ]; then
-    curl -L -b /tmp/cookies.txt "https://drive.google.com/uc?export=download&id=${IMAGES_ID}&confirm=${CONFIRM_TOKEN}" -o /tmp/images.zip
-  fi
-fi
-
-if [ -f /tmp/images.zip ] && file /tmp/images.zip | grep -q "Zip\|zip"; then
-  unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
-  echo "Images extracted successfully" >> /var/log/user-data.log
+CONFIRM_TOKEN=$(grep -oE 'confirm=[0-9A-Za-z_-]+' /tmp/gdpage | head -n1 | sed 's/confirm=//; s/&amp.*//')
+if [ -n "${CONFIRM_TOKEN}" ]; then
+  curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&confirm=${CONFIRM_TOKEN}&id=${IMAGES_ID}" -o /tmp/images.zip
 else
-  echo "WARNING: Could not download or extract images.zip" >> /var/log/user-data.log
+  # Try direct download (may be small file or public)
+  curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/images.zip
 fi
 
-rm -f /tmp/images.zip /tmp/cookies.txt
+# Validate zip before extracting
+if [ -f /tmp/images.zip ]; then
+  if unzip -t /tmp/images.zip >/dev/null 2>&1; then
+    unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
+    echo "Images extracted successfully" >> /var/log/user-data.log
+  else
+    echo "WARNING: images.zip is not a valid zip file. Saving preview to /tmp/images.zip.html" >> /var/log/user-data.log
+    cp /tmp/images.zip /tmp/images.zip.html
+    file /tmp/images.zip >> /var/log/user-data.log
+    head -n 200 /tmp/images.zip.html >> /var/log/user-data.log
+  fi
+else
+  echo "WARNING: images.zip not downloaded" >> /var/log/user-data.log
+fi
+
+rm -f /tmp/images.zip /tmp/gcookie /tmp/gdpage
 
 PLUGIN_DIR="/var/www/html/wp-content/plugins/decklist-generator"
 mkdir -p "${PLUGIN_DIR}"
