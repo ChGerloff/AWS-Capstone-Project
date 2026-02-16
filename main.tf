@@ -282,7 +282,7 @@ resource "aws_instance" "web_server" {
   chmod -R 755 /var/www/html
 
   systemctl restart httpd
-  EOF
+EOF
 
 
   tags = {
