@@ -182,11 +182,11 @@ user_data = <<EOF
 
   # Download decks.json from Google Drive
   DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
-  wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
+  wget --no-check-certificate "https://drive.google.com/uc?export=download&id=\${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
 
   # Download images.zip from Google Drive
   IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
-  wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -O /tmp/images.zip
+  wget --no-check-certificate "https://drive.google.com/uc?export=download&id=\${IMAGES_ID}" -O /tmp/images.zip
 
   # Unzip images
   unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
@@ -194,7 +194,7 @@ user_data = <<EOF
 
   # Install plugin
   PLUGIN_DIR="/var/www/html/wp-content/plugins/decklist-generator"
-  mkdir -p "${PLUGIN_DIR}"
+  mkdir -p "\${PLUGIN_DIR}"
 
   cat > "${PLUGIN_DIR}/decklist-generator.php" <<'EOPHP'
   <?php
