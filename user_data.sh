@@ -16,15 +16,19 @@ until mysqladmin ping >/dev/null 2>&1; do
   sleep 3
 done
 
-# Wait for MariaDB to fully initialize 
-sleep 10
+# Wait for MariaDB to fully initialize
+sleep 15
 
-# Create DB + user
-sudo mysql -e "CREATE DATABASE IF NOT EXISTS wordpress;"
-sudo mysql -e "CREATE USER IF NOT EXISTS 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';"
-sudo mysql -e "ALTER USER 'wpuser'@'localhost' IDENTIFIED WITH mysql_native_password BY 'StrongPassword123!';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
-sudo mysql -e "FLUSH PRIVILEGES;"
+# Create DB + user (run as root, with logging)
+sudo mysql <<'EOF' 2>/var/log/mysql-userdata-error.log
+CREATE DATABASE IF NOT EXISTS wordpress;
+DROP USER IF EXISTS 'wpuser'@'localhost';
+CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
+ALTER USER 'wpuser'@'localhost' IDENTIFIED WITH mysql_native_password BY 'StrongPassword123!';
+GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
 
 # Install WordPress
 cd /var/www/html
