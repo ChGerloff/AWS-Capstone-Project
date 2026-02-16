@@ -1,4 +1,7 @@
 #!/bin/bash
+exec > /var/log/user-data.log 2>&1
+set -x
+
 yum update -y
 
 amazon-linux-extras install -y php8.2
@@ -10,16 +13,10 @@ systemctl start httpd
 systemctl enable mariadb
 systemctl start mariadb
 
-# Wait for MariaDB to be ready
-until mysqladmin ping >/dev/null 2>&1; do
-  echo "Waiting for MariaDB..."
-  sleep 3
-done
+echo "Waiting extra time for MariaDB full initialization..."
+sleep 20
 
-# Wait for MariaDB to fully initialize
-sleep 15
-
-# Create DB + user (run as root, with logging)
+echo "Creating WordPress database and user..."
 sudo mysql <<'EOF' 2>/var/log/mysql-userdata-error.log
 CREATE DATABASE IF NOT EXISTS wordpress;
 DROP USER IF EXISTS 'wpuser'@'localhost';
@@ -29,36 +26,31 @@ GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
+echo "Testing DB user..."
+sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" >> /var/log/user-data.log
 
-# Install WordPress
 cd /var/www/html
 wget https://wordpress.org/latest.tar.gz
 tar -xzf latest.tar.gz
 cp -r wordpress/* .
 rm -rf wordpress latest.tar.gz
 
-# Configure WordPress
 cp wp-config-sample.php wp-config.php
 sed -i "s/database_name_here/wordpress/" wp-config.php
 sed -i "s/username_here/wpuser/" wp-config.php
 sed -i "s/password_here/StrongPassword123!/" wp-config.php
 
-# Create deck data directories
 mkdir -p /var/www/html/wp-content/decks/images
 
-# Download decks.json from Google Drive
 DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
 wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
 
-# Download images.zip from Google Drive
 IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
 wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -O /tmp/images.zip
 
-# Unzip images
 unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
 rm -f /tmp/images.zip
 
-# Install plugin
 PLUGIN_DIR="/var/www/html/wp-content/plugins/decklist-generator"
 mkdir -p "${PLUGIN_DIR}"
 
@@ -149,5 +141,3 @@ chown -R apache:apache /var/www/html
 chmod -R 755 /var/www/html
 
 systemctl restart httpd
-
-
