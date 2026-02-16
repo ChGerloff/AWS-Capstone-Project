@@ -138,7 +138,6 @@ resource "aws_instance" "web_server" {
     #!/bin/bash
     yum update -y
 
-    # Install Apache + PHP + MariaDB
     amazon-linux-extras install -y php8.2
     yum install -y httpd mariadb105-server php-mysqlnd wget unzip
 
@@ -147,12 +146,17 @@ resource "aws_instance" "web_server" {
 
     systemctl enable mariadb
     systemctl start mariadb
-    sleep 5
-    systemctl restart mariadb
 
-    # Secure MySQL and create WordPress DB
-    mysql -e "CREATE DATABASE wordpress;"
-    mysql -e "CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';"
+    # Wait for MariaDB to be ready
+    until mysqladmin ping >/dev/null 2>&1; do
+      echo "Waiting for MariaDB..."
+      sleep 3
+    done
+
+    # Create DB + user
+    mysql -e "CREATE DATABASE IF NOT EXISTS wordpress;"
+    mysql -e "CREATE USER IF NOT EXISTS 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';"
+    mysql -e "ALTER USER 'wpuser'@'localhost' IDENTIFIED WITH mysql_native_password BY 'StrongPassword123!';"
     mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
     mysql -e "FLUSH PRIVILEGES;"
 
@@ -173,6 +177,7 @@ resource "aws_instance" "web_server" {
     chmod -R 755 /var/www/html
 
     systemctl restart httpd
+
   EOF
 
   tags = {
