@@ -13,21 +13,32 @@ systemctl start httpd
 systemctl enable mariadb
 systemctl start mariadb
 
-echo "Waiting extra time for MariaDB full initialization..."
-sleep 20
+echo "Waiting for MariaDB to be fully ready..."
+for i in {1..30}; do
+  if sudo mysql -e "SELECT 1" >/dev/null 2>&1; then
+    echo "MariaDB is ready"
+    break
+  fi
+  echo "Waiting for MariaDB... attempt $i/30"
+  sleep 2
+done
 
 echo "Creating WordPress database and user..."
-sudo mysql <<'EOF' 2>/var/log/mysql-userdata-error.log
+sudo mysql <<'EOF' >>/var/log/user-data.log 2>&1
 CREATE DATABASE IF NOT EXISTS wordpress;
 DROP USER IF EXISTS 'wpuser'@'localhost';
 CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
-ALTER USER 'wpuser'@'localhost' IDENTIFIED WITH mysql_native_password BY 'StrongPassword123!';
 GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
 echo "Testing DB user..."
-sudo mysql -e "SELECT user, host, plugin FROM mysql.user;" >> /var/log/user-data.log
+sudo mysql -u wpuser -pStrongPassword123! wordpress -e "SELECT 1;" >> /var/log/user-data.log 2>&1
+if [ $? -eq 0 ]; then
+  echo "Database connection successful!" >> /var/log/user-data.log
+else
+  echo "ERROR: Database connection failed!" >> /var/log/user-data.log
+fi
 
 cd /var/www/html
 wget https://wordpress.org/latest.tar.gz
@@ -36,9 +47,14 @@ cp -r wordpress/* .
 rm -rf wordpress latest.tar.gz
 
 cp wp-config-sample.php wp-config.php
-sed -i "s/database_name_here/wordpress/" wp-config.php
-sed -i "s/username_here/wpuser/" wp-config.php
-sed -i "s/password_here/StrongPassword123!/" wp-config.php
+
+# Update database configuration with proper escaping
+sed -i "s/'DB_NAME', 'database_name_here'/'DB_NAME', 'wordpress'/" wp-config.php
+sed -i "s/'DB_USER', 'username_here'/'DB_USER', 'wpuser'/" wp-config.php
+sed -i "s/'DB_PASSWORD', 'password_here'/'DB_PASSWORD', 'StrongPassword123!'/" wp-config.php
+sed -i "s/'DB_HOST', 'localhost'/'DB_HOST', 'localhost'/" wp-config.php
+
+echo "WordPress configuration updated" >> /var/log/user-data.log
 
 mkdir -p /var/www/html/wp-content/decks/images
 
