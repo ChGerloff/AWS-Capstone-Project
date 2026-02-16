@@ -140,7 +140,6 @@ resource "aws_instance" "web_server" {
   user_data = <<EOF
 #!/bin/bash
 yum update -y
-
 amazon-linux-extras install -y php8.2
 yum install -y httpd mariadb-server php-mysqlnd wget unzip
 
