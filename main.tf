@@ -139,7 +139,7 @@ resource "aws_instance" "web_server" {
     yum update -y
 
     amazon-linux-extras install -y php8.2
-    yum install -y httpd mariadb105-server php-mysqlnd wget unzip
+    yum install -y httpd mariadb-server php-mysqlnd wget unzip
 
     systemctl enable httpd
     systemctl start httpd
