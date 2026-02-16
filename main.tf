@@ -137,70 +137,7 @@ resource "aws_instance" "web_server" {
 
   user_data_replace_on_change = true
 
-  user_data = <<EOF
-#!/bin/bash
-yum update -y
-amazon-linux-extras install -y php8.2
-yum install -y httpd mariadb-server php-mysqlnd wget unzip
-
-systemctl enable httpd
-systemctl start httpd
-
-systemctl enable mariadb
-systemctl start mariadb
-
-until mysqladmin ping >/dev/null 2>&1; do
-  echo "Waiting for MariaDB..."
-  sleep 3
-done
-
-mysql -e "CREATE DATABASE IF NOT EXISTS wordpress;"
-mysql -e "CREATE USER IF NOT EXISTS 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';"
-mysql -e "ALTER USER 'wpuser'@'localhost' IDENTIFIED WITH mysql_native_password BY 'StrongPassword123!';"
-mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
-mysql -e "FLUSH PRIVILEGES;"
-
-cd /var/www/html
-wget https://wordpress.org/latest.tar.gz
-tar -xzf latest.tar.gz
-cp -r wordpress/* .
-rm -rf wordpress latest.tar.gz
-
-cp wp-config-sample.php wp-config.php
-sed -i "s/database_name_here/wordpress/" wp-config.php
-sed -i "s/username_here/wpuser/" wp-config.php
-sed -i "s/password_here/StrongPassword123!/" wp-config.php
-
-mkdir -p /var/www/html/wp-content/decks/images
-
-DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
-wget --no-check-certificate "https://drive.google.com/uc?export=download&id=\${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
-
-IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
-wget --no-check-certificate "https://drive.google.com/uc?export=download&id=\${IMAGES_ID}" -O /tmp/images.zip
-
-unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
-rm -f /tmp/images.zip
-
-PLUGIN_DIR="/var/www/html/wp-content/plugins/decklist-generator"
-mkdir -p "\${PLUGIN_DIR}"
-
-cat > "\${PLUGIN_DIR}/decklist-generator.php" <<'EOPHP'
-<?php
-// plugin code...
-EOPHP
-
-cat > "\${PLUGIN_DIR}/decklist-functions.php" <<'EOPHP'
-<?php
-// plugin code...
-EOPHP
-
-chown -R apache:apache /var/www/html
-chmod -R 755 /var/www/html
-
-systemctl restart httpd
-EOF
-
+  user_data = templatefile("${path.module}/user_data.sh", {})
 
 
   tags = {
