@@ -137,6 +137,8 @@ resource "aws_instance" "web_server" {
   user_data = <<-EOF
     #!/bin/bash
     yum update -y
+
+    # Install Apache + PHP + MariaDB
     amazon-linux-extras install -y php8.2
     yum install -y httpd mariadb105-server php-mysqlnd wget unzip
 
@@ -146,17 +148,20 @@ resource "aws_instance" "web_server" {
     systemctl enable mariadb
     systemctl start mariadb
 
+    # Secure MySQL and create WordPress DB
     mysql -e "CREATE DATABASE wordpress;"
     mysql -e "CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';"
     mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
     mysql -e "FLUSH PRIVILEGES;"
 
+    # Install WordPress
     cd /var/www/html
     wget https://wordpress.org/latest.tar.gz
     tar -xzf latest.tar.gz
     cp -r wordpress/* .
     rm -rf wordpress latest.tar.gz
 
+    # Configure WordPress
     cp wp-config-sample.php wp-config.php
     sed -i "s/database_name_here/wordpress/" wp-config.php
     sed -i "s/username_here/wpuser/" wp-config.php
@@ -172,4 +177,3 @@ resource "aws_instance" "web_server" {
     Name = "wordpress-web-server"
   }
 }
-
