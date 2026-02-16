@@ -62,10 +62,26 @@ DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
 wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
 
 IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
-wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -O /tmp/images.zip
+# Use curl with cookie handling for Google Drive download
+curl -L -b /tmp/cookies.txt -c /tmp/cookies.txt "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/images.zip
 
-unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
-rm -f /tmp/images.zip
+# If file is still HTML (Google Drive confirmation needed), extract token and retry
+if file /tmp/images.zip | grep -q "HTML"; then
+  echo "Google Drive confirmation required, extracting token..." >> /var/log/user-data.log
+  CONFIRM_TOKEN=$(grep -oP '(?<=confirm=)[^&]*' /tmp/images.zip | head -1)
+  if [ ! -z "$CONFIRM_TOKEN" ]; then
+    curl -L -b /tmp/cookies.txt "https://drive.google.com/uc?export=download&id=${IMAGES_ID}&confirm=${CONFIRM_TOKEN}" -o /tmp/images.zip
+  fi
+fi
+
+if [ -f /tmp/images.zip ] && file /tmp/images.zip | grep -q "Zip\|zip"; then
+  unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
+  echo "Images extracted successfully" >> /var/log/user-data.log
+else
+  echo "WARNING: Could not download or extract images.zip" >> /var/log/user-data.log
+fi
+
+rm -f /tmp/images.zip /tmp/cookies.txt
 
 PLUGIN_DIR="/var/www/html/wp-content/plugins/decklist-generator"
 mkdir -p "${PLUGIN_DIR}"
