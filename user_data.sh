@@ -67,20 +67,35 @@ sed -i "s/password_here/StrongPassword123!/" wp-config.php
 echo "WordPress configuration updated" >> /var/log/user-data.log
 
 mkdir -p /var/www/html/wp-content/decks/images
-
 DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
-wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
-
 IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
-# Robust Google Drive download: fetch page, extract confirm token if present, then download
-curl -s -L -c /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/gdpage
 
-CONFIRM_TOKEN=$(grep -oE 'confirm=[0-9A-Za-z_-]+' /tmp/gdpage | head -n1 | sed 's/confirm=//; s/&amp.*//')
-if [ -n "${CONFIRM_TOKEN}" ]; then
-  curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&confirm=${CONFIRM_TOKEN}&id=${IMAGES_ID}" -o /tmp/images.zip
+# Support Drive API download when DRIVE_API_KEY is provided. Files must be shared "Anyone with the link".
+DRIVE_KEY=""
+if [ -n "${DRIVE_API_KEY}" ]; then
+  DRIVE_KEY="${DRIVE_API_KEY}"
+elif [ -f /etc/drive_api_key ]; then
+  DRIVE_KEY=$(cat /etc/drive_api_key)
+fi
+
+if [ -n "${DRIVE_KEY}" ]; then
+  echo "Downloading decks.json via Google Drive API" >> /var/log/user-data.log
+  curl -s -L "https://www.googleapis.com/drive/v3/files/${DECKS_ID}?alt=media&key=${DRIVE_KEY}" -o /var/www/html/wp-content/decks/decks.json || echo "Failed to download decks.json via Drive API" >> /var/log/user-data.log
+
+  echo "Downloading images.zip via Google Drive API" >> /var/log/user-data.log
+  curl -s -L "https://www.googleapis.com/drive/v3/files/${IMAGES_ID}?alt=media&key=${DRIVE_KEY}" -o /tmp/images.zip || echo "Failed to download images.zip via Drive API" >> /var/log/user-data.log
 else
-  # Try direct download (may be small file or public)
-  curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/images.zip
+  echo "DRIVE_API_KEY not provided — falling back to public-drive download method" >> /var/log/user-data.log
+  # Fallback: try the public direct-download flow
+  curl -s -L -c /tmp/gcookie "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -o /var/www/html/wp-content/decks/decks.json || wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
+
+  curl -s -L -c /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/gdpage
+  CONFIRM_TOKEN=$(grep -oE 'confirm=[0-9A-Za-z_-]+' /tmp/gdpage | head -n1 | sed 's/confirm=//; s/&amp.*//')
+  if [ -n "${CONFIRM_TOKEN}" ]; then
+    curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&confirm=${CONFIRM_TOKEN}&id=${IMAGES_ID}" -o /tmp/images.zip
+  else
+    curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/images.zip
+  fi
 fi
 
 # Validate zip before extracting
