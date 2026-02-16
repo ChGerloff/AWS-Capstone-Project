@@ -137,7 +137,7 @@ resource "aws_instance" "web_server" {
 
   user_data_replace_on_change = true
 
-  user_data = <<-EOF
+  user_data = <<EOF
     #!/bin/bash
     yum update -y
 
