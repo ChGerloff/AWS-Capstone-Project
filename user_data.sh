@@ -71,7 +71,27 @@ function dlg_shortcode($atts) {
     $html .= '</div><style>.dlg-cards{display:flex;flex-wrap:wrap;gap:10px}.dlg-card{width:150px;font-size:12px}.dlg-card img{width:100%;height:auto}</style></div>';
     return $html;
 }
+
+function dlg_random_card_shortcode($atts) {
+    $decks = dlg_load_decks();
+    if (empty($decks)) return '<p>No cards found.</p>';
+    
+    $all_cards = array();
+    foreach ($decks as $deck) {
+        foreach ($deck['cards'] as $card) {
+            $all_cards[] = $card;
+        }
+    }
+    
+    if (empty($all_cards)) return '<p>No cards found.</p>';
+    $card = $all_cards[array_rand($all_cards)];
+    $img = DLG_IMAGES_URL . '/' . $card['id'] . '.png';
+    
+    return '<div class="dlg-random-card"><img src="' . esc_url($img) . '" style="max-width:300px;height:auto;"><div><strong>' . esc_html($card['name']) . '</strong></div></div>';
+}
+
 add_shortcode('random_deck', 'dlg_shortcode');
+add_shortcode('random_card', 'dlg_random_card_shortcode');
 EOPHP
 
 chown -R apache:apache /var/www/html
