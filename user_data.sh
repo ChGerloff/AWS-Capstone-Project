@@ -9,8 +9,10 @@ yum update -y
 amazon-linux-extras install -y php8.2
 yum install -y httpd mariadb-server php-mysqlnd wget unzip
 
-systemctl enable --now httpd
-systemctl enable --now mariadb
+systemctl enable httpd
+systemctl start httpd
+systemctl enable mariadb
+systemctl start mariadb
 
 echo "Waiting for MariaDB..."
 for i in {1..20}; do
