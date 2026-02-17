@@ -44,15 +44,23 @@ define('DLG_DECKS_JSON', WP_CONTENT_DIR . '/decks/decks.json');
 define('DLG_IMAGES_URL', content_url('decks/images'));
 
 function dlg_load_decks() {
-    if (!file_exists(DLG_DECKS_JSON)) return [];
-    return json_decode(file_get_contents(DLG_DECKS_JSON), true) ?: [];
+    if (!file_exists(DLG_DECKS_JSON)) return array();
+    $json = file_get_contents(DLG_DECKS_JSON);
+    $data = json_decode($json, true);
+    return is_array($data) ? $data : array();
 }
 
 function dlg_shortcode($atts) {
-    $atts = shortcode_atts(['leader' => ''], $atts);
+    $atts = shortcode_atts(array('leader' => ''), $atts);
     $decks = dlg_load_decks();
-    if ($atts['leader']) {
-        $decks = array_filter($decks, fn($d) => $d['leader_id'] === $atts['leader']);
+    if (!empty($atts['leader'])) {
+        $filtered = array();
+        foreach ($decks as $d) {
+            if ($d['leader_id'] === $atts['leader']) {
+                $filtered[] = $d;
+            }
+        }
+        $decks = $filtered;
     }
     if (empty($decks)) return '<p>No decks found.</p>';
     $deck = $decks[array_rand($decks)];
