@@ -5,7 +5,7 @@ set -x
 yum update -y
 
 amazon-linux-extras install -y php8.2
-yum install -y httpd mariadb-server php-mysqlnd wget unzip awscli
+yum install -y httpd mariadb-server php-mysqlnd wget unzip
 
 systemctl enable httpd
 systemctl start httpd
@@ -71,20 +71,24 @@ mkdir -p /var/www/html/wp-content/decks/images
 S3_BUCKET="ger-op-deck-image"
 S3_REGION="us-west-2"
 
-echo "Downloading decks.json from S3" >> /var/log/user-data.log
-aws s3 cp "s3://${S3_BUCKET}/decks.json" /var/www/html/wp-content/decks/decks.json --region "${S3_REGION}" >> /var/log/user-data.log 2>&1
-if [ $? -eq 0 ]; then
-  echo "Successfully downloaded decks.json from S3" >> /var/log/user-data.log
+# Use public S3 URLs (virtual-hosted style) since the bucket is public
+DECKS_URL="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/decks.json"
+IMAGES_URL="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/images.zip"
+
+echo "Downloading decks.json from public S3 URL: ${DECKS_URL}" >> /var/log/user-data.log
+curl -sfL "${DECKS_URL}" -o /var/www/html/wp-content/decks/decks.json >> /var/log/user-data.log 2>&1
+if [ $? -eq 0 ] && [ -s /var/www/html/wp-content/decks/decks.json ]; then
+  echo "Successfully downloaded decks.json" >> /var/log/user-data.log
 else
-  echo "ERROR: Failed to download decks.json from S3" >> /var/log/user-data.log
+  echo "ERROR: Failed to download decks.json from ${DECKS_URL}" >> /var/log/user-data.log
 fi
 
-echo "Downloading images.zip from S3" >> /var/log/user-data.log
-aws s3 cp "s3://${S3_BUCKET}/images.zip" /tmp/images.zip --region "${S3_REGION}" >> /var/log/user-data.log 2>&1
-if [ $? -eq 0 ]; then
-  echo "Successfully downloaded images.zip from S3" >> /var/log/user-data.log
+echo "Downloading images.zip from public S3 URL: ${IMAGES_URL}" >> /var/log/user-data.log
+curl -sfL "${IMAGES_URL}" -o /tmp/images.zip >> /var/log/user-data.log 2>&1
+if [ $? -eq 0 ] && [ -f /tmp/images.zip ]; then
+  echo "Successfully downloaded images.zip" >> /var/log/user-data.log
 else
-  echo "ERROR: Failed to download images.zip from S3" >> /var/log/user-data.log
+  echo "ERROR: Failed to download images.zip from ${IMAGES_URL}" >> /var/log/user-data.log
 fi
 
 # Validate zip before extracting
