@@ -1,45 +1,20 @@
 #!/bin/bash
-exec > /var/log/user-data.log 2>&1
-set -eux
-
-# Minimal user-data to install WordPress and fetch decks + images from public S3
-
 yum update -y
-
 amazon-linux-extras install -y php8.2
 yum install -y httpd mariadb-server php-mysqlnd wget unzip
 
-systemctl enable httpd
-systemctl start httpd
-systemctl enable mariadb
-systemctl start mariadb
+systemctl enable httpd mariadb
+systemctl start httpd mariadb
 
-echo "Waiting for MariaDB..."
-for i in {1..20}; do
-  if mysql -e "SELECT 1" >/dev/null 2>&1; then
-    echo "mariadb ready"; break
-  fi
-  sleep 2
-done
+until mysqladmin ping >/dev/null 2>&1; do sleep 3; done
 
-# Create DB and user (robust for MariaDB variations)
-mysql -e "CREATE DATABASE IF NOT EXISTS wordpress;"
-
-# attempt to drop existing users (ignore errors if they don't exist)
-mysql -e "DROP USER 'wpuser'@'localhost';" || true
-mysql -e "DROP USER 'wpuser'@'%';" || true
-
-# create users and grants using a quoted heredoc to avoid shell expansion
-mysql <<'SQL'
-CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
-CREATE USER 'wpuser'@'%' IDENTIFIED BY 'StrongPassword123!';
-GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
-GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'%';
-FLUSH PRIVILEGES;
-SQL
+mysql -e "CREATE DATABASE wordpress;"
+mysql -e "CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPass123!';"
+mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
+mysql -e "FLUSH PRIVILEGES;"
 
 cd /var/www/html
-wget -q https://wordpress.org/latest.tar.gz
+wget https://wordpress.org/latest.tar.gz
 tar -xzf latest.tar.gz
 cp -r wordpress/* .
 rm -rf wordpress latest.tar.gz
@@ -47,60 +22,52 @@ rm -rf wordpress latest.tar.gz
 cp wp-config-sample.php wp-config.php
 sed -i "s/database_name_here/wordpress/" wp-config.php
 sed -i "s/username_here/wpuser/" wp-config.php
-sed -i "s/password_here/StrongPassword123!/" wp-config.php
+sed -i "s/password_here/StrongPass123!/" wp-config.php
 
-mkdir -p /var/www/html/wp-content/decks/images
+mkdir -p wp-content/decks/images
+wget https://ger-op-deck-image.s3.us-west-2.amazonaws.com/above400.json -O wp-content/decks/decks.json
+wget https://ger-op-deck-image.s3.us-west-2.amazonaws.com/image.zip -O /tmp/images.zip
+unzip /tmp/images.zip -d wp-content/decks/images/
 
-# Download deck JSON and images.zip from public S3 URLs
-DECKS_URL="https://ger-op-deck-image.s3.us-west-2.amazonaws.com/above400.json"
-IMAGES_URL="https://ger-op-deck-image.s3.us-west-2.amazonaws.com/image.zip"
-
-curl -sfL "${DECKS_URL}" -o /var/www/html/wp-content/decks/decks.json || echo "failed downloading decks"
-curl -sfL "${IMAGES_URL}" -o /tmp/image.zip || echo "failed downloading images zip"
-
-if [ -f /tmp/image.zip ]; then
-  unzip -o /tmp/image.zip -d /var/www/html/wp-content/decks/images/ || echo "unzip failed"
-fi
-
-# Minimal plugin files (same structure as your plugin)
-PLUGIN_DIR="/var/www/html/wp-content/plugins/decklist-generator"
+PLUGIN_DIR="wp-content/plugins/decklist-generator"
 mkdir -p "${PLUGIN_DIR}"
 
 cat > "${PLUGIN_DIR}/decklist-generator.php" <<'EOPHP'
 <?php
 /**
  * Plugin Name: Decklist Generator
+ * Description: Random One Piece TCG deck generator
+ * Version: 1.0
  */
-if ( ! defined( 'ABSPATH' ) ) exit;
-define( 'DLG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'DLG_DECKS_JSON', WP_CONTENT_DIR . '/decks/decks.json' );
-define( 'DLG_IMAGES_DIR_URL', content_url( 'decks/images' ) );
-require_once DLG_PLUGIN_DIR . 'decklist-functions.php';
-function dlg_register_shortcodes() { add_shortcode( 'random_deck', 'dlg_random_deck_shortcode' ); }
-add_action( 'init', 'dlg_register_shortcodes' );
-EOPHP
+if (!defined('ABSPATH')) exit;
+define('DLG_DECKS_JSON', WP_CONTENT_DIR . '/decks/decks.json');
+define('DLG_IMAGES_URL', content_url('decks/images'));
 
-cat > "${PLUGIN_DIR}/decklist-functions.php" <<'EOPHP'
-<?php
-if ( ! defined( 'ABSPATH' ) ) exit;
 function dlg_load_decks() {
-  if ( ! file_exists( DLG_DECKS_JSON ) ) return [];
-  $data = json_decode( file_get_contents( DLG_DECKS_JSON ), true );
-  return is_array($data) ? $data : [];
+    if (!file_exists(DLG_DECKS_JSON)) return [];
+    return json_decode(file_get_contents(DLG_DECKS_JSON), true) ?: [];
 }
-function dlg_pick_random_deck( $decks ) { return empty($decks) ? null : $decks[array_rand($decks)]; }
-function dlg_render_deck_html( $deck ) {
-  if ( ! $deck ) return '<p>No deck data.</p>';
-  $out = "<div><h3>".esc_html($deck['leader_name'])."</h3><ul>";
-  foreach($deck['cards'] as $c) { $img = trailingslashit(DLG_IMAGES_DIR_URL).$c['id'].'.png'; $out .= "<li><img src='".esc_url($img)."' style='width:60px'> " . esc_html($c['name']) . " x".intval($c['count'])."</li>"; }
-  $out .= "</ul></div>"; return $out;
+
+function dlg_shortcode($atts) {
+    $atts = shortcode_atts(['leader' => ''], $atts);
+    $decks = dlg_load_decks();
+    if ($atts['leader']) {
+        $decks = array_filter($decks, fn($d) => $d['leader_id'] === $atts['leader']);
+    }
+    if (empty($decks)) return '<p>No decks found.</p>';
+    $deck = $decks[array_rand($decks)];
+
+    $html = '<div class="dlg-deck"><h3>' . esc_html($deck['leader_name']) . '</h3><div class="dlg-cards">';
+    foreach ($deck['cards'] as $card) {
+        $img = trailingslashit(DLG_IMAGES_URL) . $card['id'] . '.png';
+        $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card['name']) . ' x' . $card['count'] . '</div></div>';
+    }
+    $html .= '</div><style>.dlg-cards{display:flex;flex-wrap:wrap;gap:10px}.dlg-card{width:150px;font-size:12px}.dlg-card img{width:100%;height:auto}</style></div>';
+    return $html;
 }
-function dlg_random_deck_shortcode( $atts ) { $decks = dlg_load_decks(); $d = dlg_pick_random_deck($decks); return dlg_render_deck_html($d); }
+add_shortcode('random_deck', 'dlg_shortcode');
 EOPHP
 
 chown -R apache:apache /var/www/html
 chmod -R 755 /var/www/html
-
-systemctl restart httpd || true
-
-echo "user-data-basic finished"
+systemctl restart httpd
