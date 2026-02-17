@@ -135,58 +135,9 @@ resource "aws_security_group" "web_sg" {
 }
 
 # IAM Role for EC2 instance to access S3
-resource "aws_iam_role" "wordpress_ec2_role" {
-  name_prefix = "wordpress-ec2-role-"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name = "wordpress-ec2-role"
-  }
-}
-
-# IAM Policy for S3 access
-resource "aws_iam_role_policy" "s3_access" {
-  name_prefix = "s3-access-"
-  role        = aws_iam_role.wordpress_ec2_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject"
-        ]
-        Resource = "arn:aws:s3:::ger-op-deck-image/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:ListBucket"
-        ]
-        Resource = "arn:aws:s3:::ger-op-deck-image"
-      }
-    ]
-  })
-}
-
-# Instance profile for the EC2 role
-resource "aws_iam_instance_profile" "wordpress_profile" {
-  name_prefix = "wordpress-profile-"
-  role        = aws_iam_role.wordpress_ec2_role.name
-}
+/* Removed IAM role, role policy and instance profile resources.
+   The EC2 instance will not be assigned an instance profile; downloads use public S3 URLs.
+*/
 
 resource "aws_instance" "web_server" {
   ami                    = data.aws_ami.amazon_linux.id
@@ -194,7 +145,6 @@ resource "aws_instance" "web_server" {
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   key_name               = var.key_name
-  iam_instance_profile   = aws_iam_instance_profile.wordpress_profile.name
   associate_public_ip_address = true
 
   user_data_replace_on_change = true
