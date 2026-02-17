@@ -5,7 +5,7 @@ set -x
 yum update -y
 
 amazon-linux-extras install -y php8.2
-yum install -y httpd mariadb-server php-mysqlnd wget unzip
+yum install -y httpd mariadb-server php-mysqlnd wget unzip awscli
 
 systemctl enable httpd
 systemctl start httpd
@@ -67,35 +67,24 @@ sed -i "s/password_here/StrongPassword123!/" wp-config.php
 echo "WordPress configuration updated" >> /var/log/user-data.log
 
 mkdir -p /var/www/html/wp-content/decks/images
-DECKS_ID="1gO_0gQeMOb5q7gjrAn6j6J21LY9GaGY1"
-IMAGES_ID="1uoFUYy3kceQLiuvuG7dajxT_QxFSl9ul"
 
-# Support Drive API download when DRIVE_API_KEY is provided. Files must be shared "Anyone with the link".
-DRIVE_KEY=""
-if [ -n "${DRIVE_API_KEY}" ]; then
-  DRIVE_KEY="${DRIVE_API_KEY}"
-elif [ -f /etc/drive_api_key ]; then
-  DRIVE_KEY=$(cat /etc/drive_api_key)
+S3_BUCKET="ger-op-deck-image"
+S3_REGION="us-west-2"
+
+echo "Downloading decks.json from S3" >> /var/log/user-data.log
+aws s3 cp "s3://${S3_BUCKET}/decks.json" /var/www/html/wp-content/decks/decks.json --region "${S3_REGION}" >> /var/log/user-data.log 2>&1
+if [ $? -eq 0 ]; then
+  echo "Successfully downloaded decks.json from S3" >> /var/log/user-data.log
+else
+  echo "ERROR: Failed to download decks.json from S3" >> /var/log/user-data.log
 fi
 
-if [ -n "${DRIVE_KEY}" ]; then
-  echo "Downloading decks.json via Google Drive API" >> /var/log/user-data.log
-  curl -s -L "https://www.googleapis.com/drive/v3/files/${DECKS_ID}?alt=media&key=${DRIVE_KEY}" -o /var/www/html/wp-content/decks/decks.json || echo "Failed to download decks.json via Drive API" >> /var/log/user-data.log
-
-  echo "Downloading images.zip via Google Drive API" >> /var/log/user-data.log
-  curl -s -L "https://www.googleapis.com/drive/v3/files/${IMAGES_ID}?alt=media&key=${DRIVE_KEY}" -o /tmp/images.zip || echo "Failed to download images.zip via Drive API" >> /var/log/user-data.log
+echo "Downloading images.zip from S3" >> /var/log/user-data.log
+aws s3 cp "s3://${S3_BUCKET}/images.zip" /tmp/images.zip --region "${S3_REGION}" >> /var/log/user-data.log 2>&1
+if [ $? -eq 0 ]; then
+  echo "Successfully downloaded images.zip from S3" >> /var/log/user-data.log
 else
-  echo "DRIVE_API_KEY not provided — falling back to public-drive download method" >> /var/log/user-data.log
-  # Fallback: try the public direct-download flow
-  curl -s -L -c /tmp/gcookie "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -o /var/www/html/wp-content/decks/decks.json || wget --no-check-certificate "https://drive.google.com/uc?export=download&id=${DECKS_ID}" -O /var/www/html/wp-content/decks/decks.json
-
-  curl -s -L -c /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/gdpage
-  CONFIRM_TOKEN=$(grep -oE 'confirm=[0-9A-Za-z_-]+' /tmp/gdpage | head -n1 | sed 's/confirm=//; s/&amp.*//')
-  if [ -n "${CONFIRM_TOKEN}" ]; then
-    curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&confirm=${CONFIRM_TOKEN}&id=${IMAGES_ID}" -o /tmp/images.zip
-  else
-    curl -s -L -b /tmp/gcookie "https://drive.google.com/uc?export=download&id=${IMAGES_ID}" -o /tmp/images.zip
-  fi
+  echo "ERROR: Failed to download images.zip from S3" >> /var/log/user-data.log
 fi
 
 # Validate zip before extracting
