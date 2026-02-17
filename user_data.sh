@@ -72,7 +72,7 @@ S3_BUCKET="ger-op-deck-image"
 S3_REGION="us-west-2"
 
 # Use public S3 URLs (virtual-hosted style) since the bucket is public
-DECKS_URL="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/decks.json"
+DECKS_URL="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/above_400.json"
 IMAGES_URL="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/images.zip"
 
 echo "Downloading decks.json from public S3 URL: ${DECKS_URL}" >> /var/log/user-data.log
