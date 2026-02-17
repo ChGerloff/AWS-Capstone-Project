@@ -24,10 +24,8 @@ sed -i "s/database_name_here/wordpress/" wp-config.php
 sed -i "s/username_here/wpuser/" wp-config.php
 sed -i "s/password_here/StrongPass123!/" wp-config.php
 
-mkdir -p wp-content/decks/images
+mkdir -p wp-content/decks
 wget https://ger-op-deck-image.s3.us-west-2.amazonaws.com/above400.json -O wp-content/decks/decks.json
-wget https://ger-op-deck-image.s3.us-west-2.amazonaws.com/image.zip -O /tmp/images.zip
-unzip /tmp/images.zip -d wp-content/decks/images/
 
 PLUGIN_DIR="wp-content/plugins/decklist-generator"
 mkdir -p "${PLUGIN_DIR}"
@@ -41,7 +39,7 @@ cat > "${PLUGIN_DIR}/decklist-generator.php" <<'EOPHP'
  */
 if (!defined('ABSPATH')) exit;
 define('DLG_DECKS_JSON', WP_CONTENT_DIR . '/decks/decks.json');
-define('DLG_IMAGES_URL', content_url('decks/images'));
+define('DLG_IMAGES_URL', 'https://ger-op-deck-image.s3.us-west-2.amazonaws.com');
 
 function dlg_load_decks() {
     if (!file_exists(DLG_DECKS_JSON)) return array();
@@ -67,7 +65,7 @@ function dlg_shortcode($atts) {
 
     $html = '<div class="dlg-deck"><h3>' . esc_html($deck['leader_name']) . '</h3><div class="dlg-cards">';
     foreach ($deck['cards'] as $card) {
-        $img = trailingslashit(DLG_IMAGES_URL) . $card['id'] . '.png';
+        $img = DLG_IMAGES_URL . '/' . $card['id'] . '.png';
         $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card['name']) . ' x' . $card['count'] . '</div></div>';
     }
     $html .= '</div><style>.dlg-cards{display:flex;flex-wrap:wrap;gap:10px}.dlg-card{width:150px;font-size:12px}.dlg-card img{width:100%;height:auto}</style></div>';
