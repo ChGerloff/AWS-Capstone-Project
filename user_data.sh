@@ -91,19 +91,94 @@ else
   echo "ERROR: Failed to download images.zip from ${IMAGES_URL}" >> /var/log/user-data.log
 fi
 
-# Validate zip before extracting
+# Validate zip before extracting; if invalid/missing, fall back to per-image download
 if [ -f /tmp/images.zip ]; then
   if unzip -t /tmp/images.zip >/dev/null 2>&1; then
     unzip /tmp/images.zip -d /var/www/html/wp-content/decks/images/
     echo "Images extracted successfully" >> /var/log/user-data.log
   else
-    echo "WARNING: images.zip is not a valid zip file. Saving preview to /tmp/images.zip.html" >> /var/log/user-data.log
+    echo "WARNING: images.zip is not a valid zip file — attempting per-image download fallback" >> /var/log/user-data.log
     cp /tmp/images.zip /tmp/images.zip.html
     file /tmp/images.zip >> /var/log/user-data.log
     head -n 200 /tmp/images.zip.html >> /var/log/user-data.log
+
+    if [ -f /var/www/html/wp-content/decks/decks.json ]; then
+      echo "Parsing decks.json for image IDs" >> /var/log/user-data.log
+
+      # Extract unique image ids using python (try python3 then python)
+      IDS=$(python3 - <<'PY'
+import json,sys
+try:
+    data=json.load(open('/var/www/html/wp-content/decks/decks.json'))
+except Exception:
+    sys.exit(0)
+ids=set()
+for d in data:
+    for c in d.get('cards',[]):
+        cid=c.get('id')
+        if cid:
+            ids.add(cid)
+print('\n'.join(sorted(ids)))
+PY
+)
+      if [ -z "${IDS}" ]; then
+        echo "No image IDs found in decks.json" >> /var/log/user-data.log
+      else
+        echo "Downloading ${IDS} images individually" >> /var/log/user-data.log
+        while IFS= read -r id; do
+          [ -z "$id" ] && continue
+          img_url="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/images/${id}.png"
+          curl -sfL "$img_url" -o "/var/www/html/wp-content/decks/images/${id}.png" >> /var/log/user-data.log 2>&1
+          if [ $? -eq 0 ]; then
+            echo "Downloaded ${id}.png" >> /var/log/user-data.log
+          else
+            echo "Failed to download ${id}.png from ${img_url}" >> /var/log/user-data.log
+          fi
+        done <<< "${IDS}"
+      fi
+    else
+      echo "decks.json not available — cannot perform per-image fallback" >> /var/log/user-data.log
+    fi
   fi
 else
-  echo "WARNING: images.zip not downloaded" >> /var/log/user-data.log
+  echo "WARNING: images.zip not downloaded — attempting per-image download fallback" >> /var/log/user-data.log
+
+  if [ -f /var/www/html/wp-content/decks/decks.json ]; then
+    echo "Parsing decks.json for image IDs" >> /var/log/user-data.log
+
+    IDS=$(python3 - <<'PY'
+import json,sys
+try:
+    data=json.load(open('/var/www/html/wp-content/decks/decks.json'))
+except Exception:
+    sys.exit(0)
+ids=set()
+for d in data:
+    for c in d.get('cards',[]):
+        cid=c.get('id')
+        if cid:
+            ids.add(cid)
+print('\n'.join(sorted(ids)))
+PY
+)
+    if [ -z "${IDS}" ]; then
+      echo "No image IDs found in decks.json" >> /var/log/user-data.log
+    else
+      echo "Downloading ${IDS} images individually" >> /var/log/user-data.log
+      while IFS= read -r id; do
+        [ -z "$id" ] && continue
+        img_url="https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/images/${id}.png"
+        curl -sfL "$img_url" -o "/var/www/html/wp-content/decks/images/${id}.png" >> /var/log/user-data.log 2>&1
+        if [ $? -eq 0 ]; then
+          echo "Downloaded ${id}.png" >> /var/log/user-data.log
+        else
+          echo "Failed to download ${id}.png from ${img_url}" >> /var/log/user-data.log
+        fi
+      done <<< "${IDS}"
+    fi
+  else
+    echo "decks.json not available — cannot perform per-image fallback" >> /var/log/user-data.log
+  fi
 fi
 
 rm -f /tmp/images.zip /tmp/gcookie /tmp/gdpage
