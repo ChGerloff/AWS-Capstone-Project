@@ -1,5 +1,5 @@
 #!/bin/bash
-exec > /var/log/user-data-basic.log 2>&1
+exec > /var/log/user-data.log 2>&1
 set -eux
 
 # Minimal user-data to install WordPress and fetch decks + images from public S3
@@ -20,11 +20,19 @@ for i in {1..20}; do
   sleep 2
 done
 
-# Create DB and user
+# Create DB and user (robust for MariaDB variations)
+mysql -e "CREATE DATABASE IF NOT EXISTS wordpress;"
+
+# attempt to drop existing users (ignore errors if they don't exist)
+mysql -e "DROP USER 'wpuser'@'localhost';" || true
+mysql -e "DROP USER 'wpuser'@'%';" || true
+
+# create users and grants using a quoted heredoc to avoid shell expansion
 mysql <<'SQL'
-CREATE DATABASE IF NOT EXISTS wordpress;
-CREATE USER IF NOT EXISTS 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
+CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
+CREATE USER 'wpuser'@'%' IDENTIFIED BY 'StrongPassword123!';
 GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
+GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'%';
 FLUSH PRIVILEGES;
 SQL
 
