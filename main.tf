@@ -144,7 +144,7 @@ resource "aws_instance" "web_server" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
-  key_name               = var.key_name
+  #key_name               = var.key_name
   associate_public_ip_address = true
 
   user_data_replace_on_change = true
