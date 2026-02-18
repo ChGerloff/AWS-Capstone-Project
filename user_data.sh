@@ -54,7 +54,7 @@ function dlg_shortcode($atts) {
     if (!empty($atts['leader'])) {
         $filtered = array();
         foreach ($decks as $d) {
-            if ($d['leader_id'] === $atts['leader']) {
+            if (isset($d['leader']) && $d['leader'] === $atts['leader']) {
                 $filtered[] = $d;
             }
         }
@@ -63,11 +63,16 @@ function dlg_shortcode($atts) {
     if (empty($decks)) return '<p>No decks found.</p>';
     $deck = $decks[array_rand($decks)];
 
-    $html = '<div class="dlg-deck"><h3>' . esc_html($deck['leader_name']) . '</h3><div class="dlg-cards">';
-    foreach ($deck['cards'] as $card) {
-        $img = DLG_IMAGES_URL . '/' . $card['id'] . '.png';
-        $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card['name']) . ' x' . $card['count'] . '</div></div>';
+    $leader_name = isset($deck['humanname']) ? $deck['humanname'] : 'Unknown';
+    $html = '<div class="dlg-deck"><h3>' . esc_html($leader_name) . '</h3><div class="dlg-cards">';
+    
+    if (isset($deck['deck']) && is_array($deck['deck'])) {
+        foreach ($deck['deck'] as $card_id => $count) {
+            $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
+            $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
+        }
     }
+    
     $html .= '</div><style>.dlg-cards{display:flex;flex-wrap:wrap;gap:10px}.dlg-card{width:150px;font-size:12px}.dlg-card img{width:100%;height:auto}</style></div>';
     return $html;
 }
@@ -78,16 +83,18 @@ function dlg_random_card_shortcode($atts) {
     
     $all_cards = array();
     foreach ($decks as $deck) {
-        foreach ($deck['cards'] as $card) {
-            $all_cards[] = $card;
+        if (isset($deck['deck']) && is_array($deck['deck'])) {
+            foreach ($deck['deck'] as $card_id => $count) {
+                $all_cards[] = $card_id;
+            }
         }
     }
     
     if (empty($all_cards)) return '<p>No cards found.</p>';
-    $card = $all_cards[array_rand($all_cards)];
-    $img = DLG_IMAGES_URL . '/' . $card['id'] . '.png';
+    $card_id = $all_cards[array_rand($all_cards)];
+    $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
     
-    return '<div class="dlg-random-card"><img src="' . esc_url($img) . '" style="max-width:300px;height:auto;"><div><strong>' . esc_html($card['name']) . '</strong></div></div>';
+    return '<div class="dlg-random-card"><img src="' . esc_url($img) . '" style="max-width:300px;height:auto;"><div><strong>' . esc_html($card_id) . '</strong></div></div>';
 }
 
 add_shortcode('random_deck', 'dlg_shortcode');
