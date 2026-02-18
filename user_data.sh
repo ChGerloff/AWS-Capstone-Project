@@ -25,7 +25,7 @@ sed -i "s/username_here/wpuser/" wp-config.php
 sed -i "s/password_here/StrongPass123!/" wp-config.php
 
 mkdir -p wp-content/decks
-wget https://ger-op-decks-images.s3.us-west-2.amazonaws.com/above400.json -O wp-content/decks/decks.json
+wget https://ger-op-decks-images.s3.eu-north-1.amazonaws.com/above400.json -O wp-content/decks/decks.json
 
 PLUGIN_DIR="wp-content/plugins/decklist-generator"
 mkdir -p "${PLUGIN_DIR}"
@@ -39,7 +39,7 @@ cat > "${PLUGIN_DIR}/decklist-generator.php" <<'EOPHP'
  */
 if (!defined('ABSPATH')) exit;
 define('DLG_DECKS_JSON', WP_CONTENT_DIR . '/decks/decks.json');
-define('DLG_IMAGES_URL', 'https://ger-op-decks-images.s3.us-west-2.amazonaws.com');
+define('DLG_IMAGES_URL', 'https://ger-op-decks-images.s3.eu-north-1.amazonaws.com');
 
 function dlg_load_decks() {
     if (!file_exists(DLG_DECKS_JSON)) return array();
