@@ -157,6 +157,7 @@ function dlg_deck_viewer_shortcode($atts) {
     $html .= '<div class="dlg-cards">';
     if (isset($deck['deck']) && is_array($deck['deck'])) {
         foreach ($deck['deck'] as $card_id => $count) {
+            if ($card_id === $leader_id) continue;
             $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
             $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '" class="dlg-card-img"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
         }
@@ -203,11 +204,32 @@ function dlg_deck_viewer_shortcode($atts) {
     $html .= '.dlg-leader-card-display{flex-shrink:0}';
     $html .= '.dlg-leader-card-display img{width:200px;height:auto}';
     $html .= '.dlg-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1}';
-    $html .= '.dlg-card{font-size:12px}';
+    $html .= '.dlg-card{font-size:12px;position:relative}';
     $html .= '.dlg-card img{width:100%;height:auto}';
-    $html .= '.dlg-card-img{cursor:pointer;transition:transform 0.2s}';
-    $html .= '.dlg-card-img:hover{transform:scale(2.5);z-index:1000;position:relative}';
+    $html .= '.dlg-card-img{cursor:pointer}';
     $html .= '</style>';
+    $html .= '<script>';
+    $html .= 'document.addEventListener("DOMContentLoaded",function(){';
+    $html .= 'let zoomedImg=null;';
+    $html .= 'document.querySelectorAll(".dlg-card-img").forEach(img=>{';
+    $html .= 'img.addEventListener("mouseenter",function(e){';
+    $html .= 'zoomedImg=document.createElement("img");';
+    $html .= 'zoomedImg.src=this.src;';
+    $html .= 'zoomedImg.style.position="fixed";';
+    $html .= 'zoomedImg.style.width="400px";';
+    $html .= 'zoomedImg.style.zIndex="10000";';
+    $html .= 'zoomedImg.style.pointerEvents="none";';
+    $html .= 'document.body.appendChild(zoomedImg);';
+    $html .= '});';
+    $html .= 'img.addEventListener("mousemove",function(e){';
+    $html .= 'if(zoomedImg){zoomedImg.style.left=(e.clientX+10)+"px";zoomedImg.style.top=(e.clientY+10)+"px";}';
+    $html .= '});';
+    $html .= 'img.addEventListener("mouseleave",function(){';
+    $html .= 'if(zoomedImg){zoomedImg.remove();zoomedImg=null;}';
+    $html .= '});';
+    $html .= '});';
+    $html .= '});';
+    $html .= '</script>';
     
     return $html;
 }
