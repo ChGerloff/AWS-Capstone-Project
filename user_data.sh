@@ -59,48 +59,104 @@ function dlg_load_decks_for_leader($leader_id) {
     return is_array($data) ? $data : array();
 }
 
-function dlg_deck_form_shortcode($atts) {
+function dlg_leader_gallery_shortcode($atts) {
     $leaders = dlg_load_leaders();
     if (empty($leaders)) return '<p>No leaders available.</p>';
     
-    $html = '<form method="get" action="">';
-    $html .= '<label for="leader">Choose a Leader:</label> ';
-    $html .= '<select name="leader" id="leader">';
-    $html .= '<option value="">-- Select Leader --</option>';
+    $html = '<div class="dlg-leader-gallery">';
     foreach ($leaders as $leader) {
-        $selected = (isset($_GET['leader']) && $_GET['leader'] === $leader['id']) ? 'selected' : '';
-        $html .= '<option value="' . esc_attr($leader['id']) . '" ' . $selected . '>' . esc_html($leader['name']) . '</option>';
+        $img = DLG_IMAGES_URL . '/' . $leader['id'] . '.png';
+        $url = add_query_arg('leader', $leader['id']);
+        $html .= '<div class="dlg-leader-card">';
+        $html .= '<a href="' . esc_url($url) . '">';
+        $html .= '<img src="' . esc_url($img) . '" alt="' . esc_attr($leader['name']) . '">';
+        $html .= '<div class="dlg-leader-name">' . esc_html($leader['name']) . '</div>';
+        $html .= '</a></div>';
     }
-    $html .= '</select> ';
-    $html .= '<button type="submit">Show Random Deck</button>';
-    $html .= '</form>';
-    
-    if (isset($_GET['leader']) && !empty($_GET['leader'])) {
-        $leader_id = sanitize_text_field($_GET['leader']);
-        $decks = dlg_load_decks_for_leader($leader_id);
-        
-        if (empty($decks)) {
-            $html .= '<p>No decks found for this leader.</p>';
-        } else {
-            $deck = $decks[array_rand($decks)];
-            $leader_name = isset($deck['humanname']) ? $deck['humanname'] : 'Unknown';
-            $html .= '<div class="dlg-deck"><h3>' . esc_html($leader_name) . '</h3><div class="dlg-cards">';
-            
-            if (isset($deck['deck']) && is_array($deck['deck'])) {
-                foreach ($deck['deck'] as $card_id => $count) {
-                    $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
-                    $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
-                }
-            }
-            
-            $html .= '</div><style>.dlg-cards{display:flex;flex-wrap:wrap;gap:10px}.dlg-card{width:150px;font-size:12px}.dlg-card img{width:100%;height:auto}</style></div>';
-        }
-    }
+    $html .= '</div>';
+    $html .= '<style>';
+    $html .= '.dlg-leader-gallery{display:flex;flex-wrap:wrap;gap:15px;margin:20px 0}';
+    $html .= '.dlg-leader-card{width:200px;text-align:center;border:2px solid #ddd;border-radius:8px;padding:10px;transition:transform 0.2s}';
+    $html .= '.dlg-leader-card:hover{transform:scale(1.05);border-color:#333}';
+    $html .= '.dlg-leader-card img{width:100%;height:auto;border-radius:5px}';
+    $html .= '.dlg-leader-name{margin-top:10px;font-weight:bold;font-size:14px}';
+    $html .= '</style>';
     
     return $html;
 }
 
-add_shortcode('deck_selector', 'dlg_deck_form_shortcode');
+function dlg_deck_viewer_shortcode($atts) {
+    if (!isset($_GET['leader']) || empty($_GET['leader'])) {
+        return '<p>Please select a leader from the gallery.</p>';
+    }
+    
+    $leader_id = sanitize_text_field($_GET['leader']);
+    $decks = dlg_load_decks_for_leader($leader_id);
+    
+    if (empty($decks)) {
+        return '<p>No decks found for this leader.</p>';
+    }
+    
+    $leader_name = isset($decks[0]['humanname']) ? $decks[0]['humanname'] : 'Unknown';
+    
+    // Calculate card statistics
+    $card_counts = array();
+    foreach ($decks as $deck) {
+        if (isset($deck['deck']) && is_array($deck['deck'])) {
+            foreach ($deck['deck'] as $card_id => $count) {
+                if (!isset($card_counts[$card_id])) {
+                    $card_counts[$card_id] = 0;
+                }
+                $card_counts[$card_id]++;
+            }
+        }
+    }
+    arsort($card_counts);
+    $top_cards = array_slice($card_counts, 0, 10, true);
+    
+    // Display statistics
+    $html = '<div class="dlg-stats">';
+    $html .= '<h2>' . esc_html($leader_name) . '</h2>';
+    $html .= '<p>Total Decks: ' . count($decks) . '</p>';
+    $html .= '<h3>Most Played Cards</h3>';
+    $html .= '<div class="dlg-top-cards">';
+    foreach ($top_cards as $card_id => $appearances) {
+        $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
+        $percentage = round(($appearances / count($decks)) * 100);
+        $html .= '<div class="dlg-top-card">';
+        $html .= '<img src="' . esc_url($img) . '">';
+        $html .= '<div>' . esc_html($card_id) . '</div>';
+        $html .= '<div>' . $appearances . ' decks (' . $percentage . '%)</div>';
+        $html .= '</div>';
+    }
+    $html .= '</div>';
+    
+    // Display random deck
+    $html .= '<h3>Random Deck</h3>';
+    $deck = $decks[array_rand($decks)];
+    $html .= '<div class="dlg-cards">';
+    if (isset($deck['deck']) && is_array($deck['deck'])) {
+        foreach ($deck['deck'] as $card_id => $count) {
+            $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
+            $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
+        }
+    }
+    $html .= '</div>';
+    
+    $html .= '<style>';
+    $html .= '.dlg-top-cards{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}';
+    $html .= '.dlg-top-card{width:150px;text-align:center;font-size:12px}';
+    $html .= '.dlg-top-card img{width:100%;height:auto}';
+    $html .= '.dlg-cards{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}';
+    $html .= '.dlg-card{width:150px;font-size:12px}';
+    $html .= '.dlg-card img{width:100%;height:auto}';
+    $html .= '</style></div>';
+    
+    return $html;
+}
+
+add_shortcode('leader_gallery', 'dlg_leader_gallery_shortcode');
+add_shortcode('deck_viewer', 'dlg_deck_viewer_shortcode');
 EOPHP
 
 chown -R apache:apache /var/www/html
