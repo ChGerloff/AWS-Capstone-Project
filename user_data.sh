@@ -158,7 +158,7 @@ function dlg_deck_viewer_shortcode($atts) {
     if (isset($deck['deck']) && is_array($deck['deck'])) {
         foreach ($deck['deck'] as $card_id => $count) {
             $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
-            $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
+            $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '" class="dlg-card-img"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
         }
     }
     $html .= '</div></div>';
@@ -187,31 +187,12 @@ function dlg_deck_viewer_shortcode($atts) {
         $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
         $percentage = round(($appearances / count($filtered_decks)) * 100);
         $html .= '<div class="dlg-top-card">';
-        $html .= '<img src="' . esc_url($img) . '">';
+        $html .= '<img src="' . esc_url($img) . '" class="dlg-card-img">';
         $html .= '<div>' . esc_html($card_id) . '</div>';
         $html .= '<div>' . $appearances . ' decks (' . $percentage . '%)</div>';
         $html .= '</div>';
     }
-    $html .= '</div>';
-    
-    // Display random deck with leader card on the left
-    $html .= '<h3>Random Deck</h3>';
-    $deck = $filtered_decks[array_rand($filtered_decks)];
-    $total_cards = isset($deck['deck']) ? array_sum($deck['deck']) : 0;
-    
-    $html .= '<div class="dlg-deck-container">';
-    $html .= '<div class="dlg-leader-card-display">';
-    $html .= '<img src="' . esc_url(DLG_IMAGES_URL . '/' . $leader_id . '.png') . '">';
-    $html .= '</div>';
-    $html .= '<div class="dlg-cards">';
-    if (isset($deck['deck']) && is_array($deck['deck'])) {
-        foreach ($deck['deck'] as $card_id => $count) {
-            $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
-            $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
-        }
-    }
-    $html .= '</div></div>';
-    $html .= '<p><strong>Total Cards: ' . $total_cards . '</strong></p>';;
+    $html .= '</div></div>';;;
     
     $html .= '<style>';
     $html .= '.dlg-controls{margin:20px 0}';
@@ -224,7 +205,9 @@ function dlg_deck_viewer_shortcode($atts) {
     $html .= '.dlg-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1}';
     $html .= '.dlg-card{font-size:12px}';
     $html .= '.dlg-card img{width:100%;height:auto}';
-    $html .= '</style></div>';
+    $html .= '.dlg-card-img{cursor:pointer;transition:transform 0.2s}';
+    $html .= '.dlg-card-img:hover{transform:scale(2.5);z-index:1000;position:relative}';
+    $html .= '</style>';
     
     return $html;
 }
