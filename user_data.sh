@@ -63,8 +63,8 @@ function dlg_leader_gallery_shortcode($atts) {
     $leaders = dlg_load_leaders();
     if (empty($leaders)) return '<p>No leaders available.</p>';
     
-    // Get the deck viewer page URL (you can change 'deck-viewer' to your page slug)
-    $deck_page_url = home_url('/deck-viewer/');
+    // Get the deck viewer page URL
+    $deck_page_url = home_url('/index.php/deck-viewer/');
     
     $html = '<div class="dlg-leader-gallery">';
     foreach ($leaders as $leader) {
@@ -115,10 +115,18 @@ function dlg_deck_viewer_shortcode($atts) {
         return '<p>No decks with 45+ cards found for this leader.</p>';
     }
     
-    $leader_name = isset($filtered_decks[0]['humanname']) ? $filtered_decks[0]['humanname'] : 'Unknown';
     $leaders = dlg_load_leaders();
     
-    // Leader dropdown and refresh button
+    // Get leader name from leaders.json
+    $leader_name = 'Unknown';
+    foreach ($leaders as $leader) {
+        if ($leader['id'] === $leader_id) {
+            $leader_name = $leader['name'];
+            break;
+        }
+    }
+    
+    // Leader dropdown
     $html = '<div class="dlg-controls">';
     $html .= '<form method="get" action="" style="display:inline-block;margin-right:10px;">';
     $html .= '<select name="leader" onchange="this.form.submit()">';
@@ -126,11 +134,35 @@ function dlg_deck_viewer_shortcode($atts) {
         $selected = ($leader['id'] === $leader_id) ? 'selected' : '';
         $html .= '<option value="' . esc_attr($leader['id']) . '" ' . $selected . '>' . esc_html($leader['name']) . '</option>';
     }
-    $html .= '</select></form>';
-    $html .= '<form method="get" action="" style="display:inline-block;">';
+    $html .= '</select></form></div>';
+    
+    $html .= '<h2>' . esc_html($leader_name) . '</h2>';
+    $html .= '<p>Total Decks: ' . count($filtered_decks) . '</p>';
+    
+    // Random deck button
+    $html .= '<h3>Random Deck</h3>';
+    $html .= '<form method="get" action="" style="margin-bottom:20px;">';
     $html .= '<input type="hidden" name="leader" value="' . esc_attr($leader_id) . '">';
     $html .= '<button type="submit">New Random Deck</button>';
-    $html .= '</form></div>';
+    $html .= '</form>';
+    
+    // Display random deck with leader card on the left
+    $deck = $filtered_decks[array_rand($filtered_decks)];
+    $total_cards = isset($deck['deck']) ? array_sum($deck['deck']) : 0;
+    
+    $html .= '<div class="dlg-deck-container">';
+    $html .= '<div class="dlg-leader-card-display">';
+    $html .= '<img src="' . esc_url(DLG_IMAGES_URL . '/' . $leader_id . '.png') . '">';
+    $html .= '</div>';
+    $html .= '<div class="dlg-cards">';
+    if (isset($deck['deck']) && is_array($deck['deck'])) {
+        foreach ($deck['deck'] as $card_id => $count) {
+            $img = DLG_IMAGES_URL . '/' . $card_id . '.png';
+            $html .= '<div class="dlg-card"><img src="' . esc_url($img) . '"><div>' . esc_html($card_id) . ' x' . $count . '</div></div>';
+        }
+    }
+    $html .= '</div></div>';
+    $html .= '<p><strong>Total Cards: ' . $total_cards . '</strong></p>';
     
     // Calculate card statistics
     $card_counts = array();
@@ -149,8 +181,6 @@ function dlg_deck_viewer_shortcode($atts) {
     
     // Display statistics
     $html .= '<div class="dlg-stats">';
-    $html .= '<h2>' . esc_html($leader_name) . '</h2>';
-    $html .= '<p>Total Decks: ' . count($filtered_decks) . '</p>';
     $html .= '<h3>Most Played Cards</h3>';
     $html .= '<div class="dlg-top-cards">';
     foreach ($top_cards as $card_id => $appearances) {
@@ -181,7 +211,7 @@ function dlg_deck_viewer_shortcode($atts) {
         }
     }
     $html .= '</div></div>';
-    $html .= '<p><strong>Total Cards: ' . $total_cards . '</strong></p>';
+    $html .= '<p><strong>Total Cards: ' . $total_cards . '</strong></p>';;
     
     $html .= '<style>';
     $html .= '.dlg-controls{margin:20px 0}';
@@ -191,8 +221,8 @@ function dlg_deck_viewer_shortcode($atts) {
     $html .= '.dlg-deck-container{display:flex;gap:20px;margin:20px 0}';
     $html .= '.dlg-leader-card-display{flex-shrink:0}';
     $html .= '.dlg-leader-card-display img{width:200px;height:auto}';
-    $html .= '.dlg-cards{display:flex;flex-wrap:wrap;gap:10px;flex:1}';
-    $html .= '.dlg-card{width:150px;font-size:12px}';
+    $html .= '.dlg-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1}';
+    $html .= '.dlg-card{font-size:12px}';
     $html .= '.dlg-card img{width:100%;height:auto}';
     $html .= '</style></div>';
     
