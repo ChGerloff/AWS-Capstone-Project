@@ -1,17 +1,17 @@
 #!/bin/bash
 yum update -y
 amazon-linux-extras install -y php8.2
-yum install -y httpd mariadb-server php-mysqlnd wget unzip
+yum install -y httpd php-mysqlnd wget unzip mysql
 
-systemctl enable httpd mariadb
-systemctl start httpd mariadb
+systemctl enable httpd
+systemctl start httpd
 
-until mysqladmin ping >/dev/null 2>&1; do sleep 3; done
-
-mysql -e "CREATE DATABASE wordpress;"
-mysql -e "CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'StrongPass123!';"
-mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
-mysql -e "FLUSH PRIVILEGES;"
+# Wait for RDS to be available
+RDS_ENDPOINT="${rds_endpoint}"
+until mysqladmin ping -h "${rds_address}" -u wpuser -p'StrongPass123!' >/dev/null 2>&1; do
+  echo "Waiting for RDS..."
+  sleep 5
+done
 
 cd /var/www/html
 wget https://wordpress.org/latest.tar.gz
@@ -23,6 +23,7 @@ cp wp-config-sample.php wp-config.php
 sed -i "s/database_name_here/wordpress/" wp-config.php
 sed -i "s/username_here/wpuser/" wp-config.php
 sed -i "s/password_here/StrongPass123!/" wp-config.php
+sed -i "s/localhost/${rds_address}/" wp-config.php
 sed -i "/<?php/a define('WP_MEMORY_LIMIT', '256M');" wp-config.php
 
 mkdir -p wp-content/decks
