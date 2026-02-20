@@ -149,7 +149,10 @@ resource "aws_instance" "web_server" {
 
   user_data_replace_on_change = true
 
-  user_data = base64encode(file("${path.module}/user_data.sh"))
+  user_data = templatefile("${path.module}/user_data.sh", {
+    rds_endpoint = aws_db_instance.wordpress.endpoint
+    rds_address  = aws_db_instance.wordpress.address
+  })
 
   tags = {
     Name = "wordpress-web-server"
