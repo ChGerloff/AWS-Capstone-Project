@@ -152,6 +152,7 @@ resource "aws_instance" "web_server" {
   user_data = templatefile("${path.module}/user_data.sh", {
     rds_endpoint = aws_db_instance.wordpress.endpoint
     rds_address  = aws_db_instance.wordpress.address
+    PLUGIN_DIR   = "wp-content/plugins/decklist-generator"
   })
 
   tags = {
