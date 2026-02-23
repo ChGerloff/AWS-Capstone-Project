@@ -286,9 +286,6 @@ function dlg_deck_viewer_shortcode($atts) {
     return $html;
 }
 
-add_shortcode('leader_gallery', 'dlg_leader_gallery_shortcode');
-add_shortcode('deck_viewer', 'dlg_deck_viewer_shortcode');
-add_shortcode('ai_deck_generator', 'dlg_ai_deck_generator_shortcode');
 
 function dlg_ai_deck_generator_shortcode($atts) {
     if (!isset($_GET['leader']) || empty($_GET['leader'])) {
@@ -389,6 +386,11 @@ function dlg_ai_deck_generator_shortcode($atts) {
     
     return $html;
 }
+
+add_shortcode('leader_gallery', 'dlg_leader_gallery_shortcode');
+add_shortcode('deck_viewer', 'dlg_deck_viewer_shortcode');
+add_shortcode('ai_deck_generator', 'dlg_ai_deck_generator_shortcode');
+
 EOPHP
 
 chown -R apache:apache /var/www/html
