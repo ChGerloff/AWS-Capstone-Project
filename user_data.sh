@@ -112,11 +112,13 @@ function dlg_load_decks_for_leader($leader_id) {
 }
 
 function dlg_leader_gallery_shortcode($atts) {
+    $atts = shortcode_atts(array('target' => 'deck-viewer'), $atts);
     $leaders = dlg_load_leaders();
     if (empty($leaders)) return '<p>No leaders available.</p>';
     
-    // Get the deck viewer page URL
-    $deck_page_url = home_url('/index.php/deck-viewer/');
+    // Get the target page URL
+    $target_page = $atts['target'];
+    $deck_page_url = home_url('/index.php/' . $target_page . '/');
     
     $html = '<div class="dlg-leader-gallery">';
     foreach ($leaders as $leader) {
