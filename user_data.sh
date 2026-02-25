@@ -232,7 +232,7 @@ function dlg_deck_viewer_shortcode($atts) {
         }
     }
     arsort($card_counts);
-    $top_cards = array_slice($card_counts, 0, 16, true);
+    $top_cards = array_slice($card_counts, 0, 24, true);
     
     // Display statistics
     $html .= '<div class="dlg-stats">';
