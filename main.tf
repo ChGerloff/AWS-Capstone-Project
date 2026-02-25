@@ -100,7 +100,7 @@ resource "aws_subnet" "private_b" {
 resource "aws_security_group" "web_sg" {
   name        = "web-sg"
   description = "Allow inbound traffic and outbound traffic"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = aws_vpc.dev_vpc.id
 
   tags = {
     Name = "web_sg"
